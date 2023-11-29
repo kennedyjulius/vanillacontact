@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:uuid/uuid.dart';
 
 void main() {
   runApp(const MyApp());
@@ -22,34 +23,43 @@ class MyApp extends StatelessWidget {
 }
 
 class Contact {
+  final String id;
   final String name;
   Contact({
     required this.name,
-  });
+  }): id =  Uuid().v4();
 
   
   
 }
-class ContactBook {
-  ContactBook._sharedInstance();
+class ContactBook extends ValueNotifier<List<Contact>> {
+  ContactBook._sharedInstance() : super([]);
   static final ContactBook _shared = ContactBook._sharedInstance();
   factory ContactBook() => _shared;
-  
+
   final List<Contact> _contacts = [];
 
-  int get length => _contacts.length;
+  int get length => value.length;
 
   void add({required Contact contact}) {
-    _contacts.add(contact);
+    final contacts = value;
+    contacts.add(contact);
+    notifyListeners(); // Notify listeners when the list changes
   }
 
   void remove({required Contact contact}) {
-    _contacts.remove(contact);
+    final contacts = value;
+    if (contacts.contains(contact)){
+      contacts.remove(contact);
+      notifyListeners();
+    }
+     // Notify listeners when the list changes
   }
 
-  Contact? contact ({required int atIndex}) =>
-   _contacts.length > atIndex ? _contacts[atIndex] : null;
+  Contact? contact({required int atIndex}) =>
+      _contacts.length > atIndex ? _contacts[atIndex] : null;
 }
+
 
 class HomePage extends StatefulWidget {
   HomePage({Key? key}) : super(key: key);
@@ -61,19 +71,38 @@ class HomePage extends StatefulWidget {
 class _HomePageState extends State<HomePage> {
   @override
   Widget build(BuildContext context) {
-    final contactBook = ContactBook();
+    //final contactBook = ContactBook();
     return Scaffold(
       appBar: AppBar(
         title: Text('Home page'),
       ),
-      body: ListView.builder(
-        itemCount: contactBook.length,
-        itemBuilder: (BuildContext context, int index) {
-          final contact = contactBook.contact(atIndex: index)!;
-        return  ListTile(
-          title: Text(contact.name),
+      body: ValueListenableBuilder(
+        valueListenable: ContactBook(),
+        builder: (context, value, child) {
+          final contacts = value as List<Contact>;
+        return ListView.builder(
+          itemCount: contacts.length,
+          itemBuilder: (BuildContext context, int index) {
+          final contact = contacts[index];
+          return  Dismissible(
+            onDismissed: (direction) {
+              contacts.remove(contact);
+            },
+            key: ValueKey(contact.id),
+            child: Material(
+              color: Colors.white,
+              elevation: 6.0,
+              child: Padding(
+                padding: const EdgeInsets.only(bottom: 5),
+                child: ListTile(
+                  title: Text(contact.name),
+                ),
+              ),
+            ),
+          );
+         },
         );
-       },
+        },
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: () {
@@ -97,13 +126,9 @@ class NewContactView extends StatefulWidget {
 class _NewContactViewState extends State<NewContactView> {
   @override
   Widget build(BuildContext context) {
-    late final TextEditingController _controller;
-    
-    @override
-    void initState() { 
-      super.initState();
-      _controller = TextEditingController();
-    }
+    // ignore: no_leading_underscores_for_local_identifiers
+    late final TextEditingController _controller = TextEditingController();
+  
     @override
     void dispose() { 
       _controller.dispose();
